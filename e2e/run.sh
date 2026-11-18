@@ -99,7 +99,6 @@ write_package "$child/pkg"
 write_package "$child_root"
 : >"$child/REPO.bazel"
 : >"$child_root/REPO.bazel"
-cp "$root/.bazelversion" "$ws/"
 printf 'build --incompatible_strict_action_env\ntest --test_output=errors\n' >"$ws/.bazelrc"
 cat >"$ws/MODULE.bazel" <<EOF
 module(name = "e2e_consumer")
@@ -141,7 +140,7 @@ local_repository(name = "fixture_child", path = "$child")
 local_repository(name = "fixture_root", path = "$child_root")
 EOF
 
-echo "rules_move e2e: HEAD $head, archive $integrity, $("$bazel_bin" --version </dev/null 2>/dev/null)"
+echo "rules_move e2e: HEAD $head, archive $integrity, $(cd "$ws" && "$bazel_bin" --version </dev/null 2>/dev/null)"
 
 # 1. Both packages build and test, from the main and the external repository.
 if bazel_cmd test //... @fixture_child//... @fixture_root//... >"$scratch/test.log" 2>&1; then
