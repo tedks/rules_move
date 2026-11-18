@@ -1,0 +1,46 @@
+"""rules_sui_move: Bazel rules that build and test Sui Move packages offline."""
+
+module(
+    name = "rules_sui_move",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+
+# Test-only dependencies; consumers never see them.
+bazel_dep(name = "rules_shell", version = "0.4.1", dev_dependency = True)
+
+# The repositories below serve this module's own tests (tests/). A consumer
+# declares its own sui_release, move_git_dependency and move_host_git; these
+# are never fetched unless one of this module's test targets is built.
+sui_release = use_repo_rule("//sui_move:repositories.bzl", "sui_release")
+
+move_git_dependency = use_repo_rule("//sui_move:repositories.bzl", "move_git_dependency")
+
+move_host_git = use_repo_rule("//sui_move:repositories.bzl", "move_host_git")
+
+move_host_git(name = "move_host_git")
+
+sui_release(
+    name = "sui_cli",
+    archives = {
+        # Declared from the same release; only linux-x86_64 has been exercised.
+        "linux-aarch64": [
+            "https://github.com/MystenLabs/sui/releases/download/mainnet-v1.80.1/sui-mainnet-v1.80.1-ubuntu-aarch64.tgz",
+            "sha256-0le4Lbx/hPhPqV8aquQTtygT/+cozLXBAS5xSSkmLyA=",
+        ],
+        "linux-x86_64": [
+            "https://github.com/MystenLabs/sui/releases/download/mainnet-v1.80.1/sui-mainnet-v1.80.1-ubuntu-x86_64.tgz",
+            "sha256-l/mu0Q4ML+MgTORjmsmS4USbF8FPIvMOn5A+rVSsczY=",
+        ],
+    },
+    version = "1.80.1",
+)
+
+# The fixture's only git dependency: the Move standard library.
+move_git_dependency(
+    name = "move_fixture_std",
+    commit = "782577ca40c9ef0b3f400ade8bc2cc2dcd0e2b23",
+    paths = ["crates/sui-framework/packages/move-stdlib"],
+    remote = "https://github.com/MystenLabs/sui.git",
+)
