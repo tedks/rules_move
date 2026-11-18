@@ -10,19 +10,24 @@ bazel_dep(name = "platforms", version = "1.0.0")
 # Test-only dependencies; consumers never see them.
 bazel_dep(name = "rules_shell", version = "0.4.1", dev_dependency = True)
 
-# The repositories below serve this module's own tests (tests/). A consumer
-# declares its own sui_release, move_git_dependency and move_host_git; these
-# are never fetched unless one of this module's test targets is built.
+# The repositories below serve only this module's own tests (tests/) and are
+# dev dependencies, so a consumer never sees or fetches them (not even with
+# `bazel fetch --all` or `bazel vendor`). A consumer declares its own
+# sui_release, move_git_dependency and move_host_git.
 sui_release = use_repo_rule("//sui_move:repositories.bzl", "sui_release")
 
 move_git_dependency = use_repo_rule("//sui_move:repositories.bzl", "move_git_dependency")
 
 move_host_git = use_repo_rule("//sui_move:repositories.bzl", "move_host_git")
 
-move_host_git(name = "move_host_git")
+move_host_git(
+    name = "move_host_git",
+    dev_dependency = True,
+)
 
 sui_release(
     name = "sui_cli",
+    dev_dependency = True,
     archives = {
         # Declared from the same release; only linux-x86_64 has been exercised.
         "linux-aarch64": [
@@ -40,6 +45,7 @@ sui_release(
 # The fixture's only git dependency: the Move standard library.
 move_git_dependency(
     name = "move_fixture_std",
+    dev_dependency = True,
     commit = "782577ca40c9ef0b3f400ade8bc2cc2dcd0e2b23",
     paths = ["crates/sui-framework/packages/move-stdlib"],
     remote = "https://github.com/MystenLabs/sui.git",

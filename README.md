@@ -186,6 +186,8 @@ E2E_BAZEL=$(nix build --no-link --print-out-paths .#bazel_7)/bin/bazel \
   nix develop --command ./e2e/run.sh          # the same check on Bazel 7.6
 ```
 
+These run only from this repository's root: the tests use dev dependencies
+(`rules_shell` and their own Sui release), which a consumer does not have.
 `//...` builds and tests the neutral fixture in `tests/move_fixture` and runs
 `tests/runner_test.sh`, which drives the runner through its failure paths.
 `e2e/run.sh` consumes an archive of the committed tree from a separate

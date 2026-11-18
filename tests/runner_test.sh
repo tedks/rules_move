@@ -17,7 +17,13 @@ shift 4
 FIXTURE=()
 for f in "$@"; do FIXTURE+=("$(abs "$f")"); done
 PACKAGE=tests/move_fixture
-SCRATCH=${TEST_TMPDIR:-$(mktemp -d)}
+if [[ -n "${TEST_TMPDIR:-}" ]]; then
+  SCRATCH=$TEST_TMPDIR
+else
+  SCRATCH=$(mktemp -d)
+  # Created just above by mktemp for this run only.
+  trap 'rm -rf -- "$SCRATCH"' EXIT
+fi
 
 failures=0
 case_root=""
