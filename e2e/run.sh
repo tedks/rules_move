@@ -8,10 +8,11 @@
 # a Move package in its main repository and another in an external
 # repository (@fixture_child, a local_repository), and checks that:
 #
-#   - both packages build bytecode and pass their tests (2 Move tests each);
+#   - every package builds identical bytecode and passes its tests (2 Move
+#     tests each);
 #   - rules_move appears exactly once on the module graph;
-#   - a broken assertion fails each package's move_test, and a compile error
-#     fails the external package's build;
+#   - a broken assertion fails the main and external packages' move_test,
+#     and a compile error fails the external package's build;
 #   - a target whose srcs come from another repository is refused, in both
 #     directions, and a package path that leaves the repository is refused.
 #
@@ -19,7 +20,8 @@
 #
 # usage: e2e/run.sh   (from the repository root, inside `nix develop`)
 # E2E_BAZEL selects the Bazel binary (default: bazel on PATH), e.g. a Bazel
-# 7.6 build; see the README. Needs network for the first fetch of the Sui
+# 7.6 build; see the README. E2E_EXPECT_BAZEL, if set, is a version prefix
+# the selected binary must report (e.g. 7.6.), so the run checks itself. Needs network for the first fetch of the Sui
 # release and the Move stdlib.
 set -euo pipefail
 
@@ -34,6 +36,8 @@ child_root=$scratch/child_root
 src=$scratch/src
 output_base=$scratch/output_base
 bazel_bin=${E2E_BAZEL:-bazel}
+# A relative path would break once bazel_cmd changes directory.
+if [[ "$bazel_bin" == */* ]]; then bazel_bin=$(cd "$(dirname "$bazel_bin")" && pwd)/$(basename "$bazel_bin"); fi
 bazel_cmd() { (cd "$ws" && "$bazel_bin" --output_base="$output_base" "$@" </dev/null); }
 cleanup() {
   bazel_cmd shutdown >/dev/null 2>&1 || true
@@ -140,9 +144,15 @@ local_repository(name = "fixture_child", path = "$child")
 local_repository(name = "fixture_root", path = "$child_root")
 EOF
 
-echo "rules_move e2e: HEAD $head, archive $integrity, $(cd "$ws" && "$bazel_bin" --version </dev/null 2>/dev/null)"
+bazel_version=$(cd "$ws" && "$bazel_bin" --version </dev/null 2>/dev/null)
+echo "rules_move e2e: HEAD $head, archive $integrity, $bazel_version"
+if [[ -n "${E2E_EXPECT_BAZEL:-}" && "$bazel_version" != "bazel ${E2E_EXPECT_BAZEL}"* ]]; then
+  echo "e2e: expected Bazel ${E2E_EXPECT_BAZEL}*, got '$bazel_version'" >&2
+  exit 1
+fi
 
-# 1. Both packages build and test, from the main and the external repository.
+# 1. Every package builds and tests: main repository, external repository,
+#    and an external repository's root.
 if bazel_cmd test //... @fixture_child//... @fixture_root//... >"$scratch/test.log" 2>&1; then
   ok "test //... @fixture_child//... @fixture_root//..."
 else
@@ -248,6 +258,15 @@ move_package(
 )
 
 move_package(
+    name = "dot_segment",
+    srcs = ["//pkg:srcs"],
+    git = "@move_host_git//:git",
+    package = "./pkg",
+    sui = "@sui_cli//:sui",
+    deps = ["@move_std//:cache.tar"],
+)
+
+move_package(
     name = "escape",
     srcs = ["//pkg:srcs"],
     git = "@move_host_git//:git",
@@ -258,6 +277,7 @@ move_package(
 EOF
 expect_fail "external target with main-repo srcs is refused" "cross:from_main must come from its own repository" -- build @fixture_child//cross:from_main
 expect_fail "package path leaving the repository is refused" "package must be a workspace-relative directory" -- build @fixture_child//cross:escape
+expect_fail "package path with a . segment is refused" "package must be a workspace-relative directory" -- build @fixture_child//cross:dot_segment
 rm -r "$child/cross"
 
 # 5. Restored tree passes again.

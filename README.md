@@ -182,7 +182,7 @@ dependency packages. A package at a repository root (a BUILD file there, or
 ```bash
 nix develop --command bazel test //...
 nix develop --command ./e2e/run.sh            # Bazel 8, after committing
-E2E_BAZEL=$(nix build --no-link --print-out-paths .#bazel_7)/bin/bazel \
+E2E_EXPECT_BAZEL=7.6. E2E_BAZEL=$(nix build --no-link --print-out-paths .#bazel_7)/bin/bazel \
   nix develop --command ./e2e/run.sh          # the same check on Bazel 7.6
 ```
 

@@ -12,7 +12,7 @@ Use the Nix dev shell for every command. Before committing, run:
 ```bash
 nix develop --command bazel test //...
 nix develop --command ./e2e/run.sh   # after committing: it tests HEAD
-E2E_BAZEL=$(nix build --no-link --print-out-paths .#bazel_7)/bin/bazel \
+E2E_EXPECT_BAZEL=7.6. E2E_BAZEL=$(nix build --no-link --print-out-paths .#bazel_7)/bin/bazel \
   nix develop --command ./e2e/run.sh # the same on Bazel 7.6
 git diff --check
 ```

@@ -67,7 +67,8 @@ _COMMON_ATTRS = {
 def _package_dir(ctx):
     # "." is the repository root: a BUILD file there, or package = ".".
     package = ctx.attr.package or ctx.label.package or "."
-    if package.startswith("/") or ".." in package.split("/") or "" in package.split("/"):
+    segments = package.split("/")
+    if package.startswith("/") or ".." in segments or "" in segments or (package != "." and "." in segments):
         fail("package must be a workspace-relative directory, got '%s'" % package)
     return package
 
