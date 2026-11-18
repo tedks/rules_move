@@ -95,7 +95,8 @@ sui_pin_test(  # the release pins must also appear in, e.g., flake.nix
 ```
 
 `srcs` must contain every file the package reads, including `local`
-dependency packages.
+dependency packages. A package at a repository root (a BUILD file there, or
+`package = "."`) is supported.
 
 ## Behavior and limits
 
@@ -180,14 +181,17 @@ dependency packages.
 
 ```bash
 nix develop --command bazel test //...
-nix develop --command ./e2e/run.sh
+nix develop --command ./e2e/run.sh            # Bazel 8, after committing
+E2E_BAZEL=$(nix build --no-link --print-out-paths .#bazel_7)/bin/bazel \
+  nix develop --command ./e2e/run.sh          # the same check on Bazel 7.6
 ```
 
 `//...` builds and tests the neutral fixture in `tests/move_fixture` and runs
 `tests/runner_test.sh`, which drives the runner through its failure paths.
 `e2e/run.sh` consumes an archive of the committed tree from a separate
 workspace through `archive_override`, with Move packages in that
-workspace's main repository and in an external repository, and checks
-builds, tests, failure propagation and the cross-repository refusals. The
+workspace's main repository, in an external repository and at the root of
+another external repository, and checks builds, identical bytecode, tests,
+failure propagation and the cross-repository refusals. The
 first run downloads the Sui release (about 1.1 GB) into Bazel's repository
 cache.

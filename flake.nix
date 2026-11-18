@@ -7,6 +7,11 @@
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
     in {
+      # Bazel 7.6 for the e2e check's older-Bazel run (see the README).
+      packages = nixpkgs.lib.genAttrs systems (system: {
+        bazel_7 = (import nixpkgs { inherit system; }).bazel_7;
+      });
+
       devShells = nixpkgs.lib.genAttrs systems (system:
         let pkgs = import nixpkgs { inherit system; };
         in {
