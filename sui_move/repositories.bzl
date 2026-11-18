@@ -1,7 +1,6 @@
 """Repository rules for offline Sui Move builds.
 
-Part of a small set of Move rules kept as exact copies in each consuming
-repository; see README.md beside this file. Change the canonical copy only.
+Part of rules_sui_move; see the README at the repository root.
 
 `sui_release` fetches one official Sui CLI release archive by integrity and
 keeps only the `sui` executable. `move_git_dependency` fetches one pinned
@@ -46,9 +45,11 @@ def _run(rctx, args, what, env = None, working_directory = ""):
     return result.stdout
 
 # Host platforms the rules know how to name, keyed as in `sui_release.archives`.
+# Labels are canonical, so the generated BUILD files resolve them the same way
+# whichever module creates the repositories.
 _PLATFORM_CONSTRAINTS = {
-    "linux-aarch64": ["@platforms//os:linux", "@platforms//cpu:aarch64"],
-    "linux-x86_64": ["@platforms//os:linux", "@platforms//cpu:x86_64"],
+    "linux-aarch64": [str(Label("@platforms//os:linux")), str(Label("@platforms//cpu:aarch64"))],
+    "linux-x86_64": [str(Label("@platforms//os:linux")), str(Label("@platforms//cpu:x86_64"))],
 }
 
 _PINS_EXPORT = """exports_files(["pins.txt"], visibility = ["//visibility:public"])
@@ -73,10 +74,10 @@ genrule(
     outs = ["%s"],
     cmd = "false",
     executable = True,
-    target_compatible_with = ["@platforms//:incompatible"],
+    target_compatible_with = ["%s"],
     visibility = ["//visibility:public"],
 )
-""" % (why, name, outs or (name + ".unavailable"))
+""" % (why, name, outs or (name + ".unavailable"), str(Label("@platforms//:incompatible")))
 
 def _sui_runtime(rctx):
     """Returns [loader, library_path] from the environment, or [] when unset."""

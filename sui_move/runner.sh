@@ -20,8 +20,7 @@
 # re-resolution, fails instead of fetching. The staged copy keeps the Sui CLI
 # from ever writing into the source tree.
 #
-# Part of a small set of Move rules kept as exact copies in each consuming
-# repository; see README.md beside this file. Change the canonical copy only.
+# Part of rules_sui_move; see the README at the repository root.
 set -euo pipefail
 
 die() {

@@ -1,7 +1,6 @@
 """Bazel rules that build and test one Sui Move package offline.
 
-Part of a small set of Move rules kept as exact copies in each consuming
-repository; see README.md beside this file. Change the canonical copy only.
+Part of rules_sui_move; see the README at the repository root.
 
 `move_package` compiles the package with `sui move build` and outputs a tree
 of bytecode: `<package name>/bytecode_modules/*.mv`, plus the compiled
@@ -17,8 +16,7 @@ Git transports are disabled at run time: a missing dependency or a stale
 Move.lock fails instead of fetching.
 
 `sui_pin_test` checks that a sui_release repeats the pins of another source
-(such as flake.nix). `move_rules_copy_test` checks a copy of these rules
-against its MANIFEST.sha256.
+(such as flake.nix).
 """
 
 def _tool_attrs(cfg):
@@ -264,48 +262,4 @@ sui_pin_test = rule(
         "pins": attr.label(allow_single_file = True, mandatory = True, doc = "`@<sui_release repo>//:pins.txt`."),
     },
     doc = "Checks that a sui_release's pins match another pin source, such as flake.nix.",
-)
-
-def _move_rules_copy_test_impl(ctx):
-    manifest = ctx.file.manifest
-    prefix = manifest.short_path[:-len(manifest.basename)]
-    for f in ctx.files.files:
-        if not f.short_path.startswith(prefix):
-            fail("%s is not under %s" % (f.short_path, prefix))
-    names = sorted([f.short_path[len(prefix):] for f in ctx.files.files])
-    script = ctx.actions.declare_file(ctx.label.name + ".sh")
-    ctx.actions.write(
-        script,
-        """#!/usr/bin/env bash
-# Fails when any file beside the manifest differs from it, or when the
-# manifest and the directory do not list the same files.
-set -euo pipefail
-cd %s
-expected=$(printf '%%s\\n' %s)
-listed=$(awk '{print $2}' MANIFEST.sha256 | LC_ALL=C sort)
-if [[ "$expected" != "$listed" ]]; then
-  echo "MANIFEST.sha256 lists different files than the directory holds" >&2
-  diff <(echo "$listed") <(echo "$expected") >&2 || true
-  exit 1
-fi
-sha256sum --check --strict MANIFEST.sha256
-# The runner is executed directly; a copy that lost its mode would only fail
-# at build time.
-[[ -x runner.sh ]] || { echo "runner.sh is not executable" >&2; exit 1; }
-""" % (_shell_quote(manifest.dirname[len(manifest.root.path):].lstrip("/") or "."), " ".join([_shell_quote(n) for n in names])),
-        is_executable = True,
-    )
-    return [DefaultInfo(
-        executable = script,
-        runfiles = ctx.runfiles(files = [manifest] + ctx.files.files),
-    )]
-
-move_rules_copy_test = rule(
-    implementation = _move_rules_copy_test_impl,
-    test = True,
-    attrs = {
-        "files": attr.label_list(allow_files = True, mandatory = True),
-        "manifest": attr.label(allow_single_file = True, mandatory = True),
-    },
-    doc = "Checks that a copy of these rules matches its MANIFEST.sha256.",
 )
