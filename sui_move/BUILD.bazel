@@ -1,0 +1,9 @@
+# Offline Sui Move rules; see the README at the repository root.
+exports_files(
+    [
+        "defs.bzl",
+        "repositories.bzl",
+        "runner.sh",
+    ],
+    visibility = ["//visibility:public"],
+)

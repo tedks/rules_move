@@ -1,0 +1,4 @@
+Pins the sui_pin_test must find (mirrors MODULE.bazel sui_cli):
+https://github.com/MystenLabs/sui/releases/download/mainnet-v1.80.1/sui-mainnet-v1.80.1-ubuntu-x86_64.tgz
+sha256-l/mu0Q4ML+MgTORjmsmS4USbF8FPIvMOn5A+rVSsczY=
+sha256-0le4Lbx/hPhPqV8aquQTtygT/+cozLXBAS5xSSkmLyA=

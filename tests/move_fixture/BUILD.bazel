@@ -1,0 +1,45 @@
+load("//sui_move:defs.bzl", "move_package", "move_test", "sui_pin_test")
+
+package(default_visibility = ["//tests:__pkg__"])
+
+filegroup(
+    name = "srcs",
+    srcs = [
+        "Move.lock",
+        "Move.toml",
+    ] + glob(
+        [
+            "sources/*.move",
+            "tests/*.move",
+        ],
+        allow_empty = False,
+    ),
+)
+
+move_package(
+    name = "move_fixture",
+    srcs = [":srcs"],
+    git = "@move_host_git//:git",
+    sui = "@sui_cli//:sui",
+    deps = ["@move_fixture_std//:cache.tar"],
+)
+
+move_test(
+    name = "move_test",
+    size = "medium",
+    srcs = [":srcs"],
+    git = "@move_host_git//:git",
+    sui = "@sui_cli//:sui",
+    # No tags: move_test adds block-network and no-remote-exec (checked by
+    # //tests:move_test_tags_test).
+    deps = ["@move_fixture_std//:cache.tar"],
+)
+
+# The pins must be found even after a "v" and when they contain + / =.
+sui_pin_test(
+    name = "sui_pin_test",
+    size = "small",
+    files = ["sui_pins.txt"],
+    pins = "@sui_cli//:pins.txt",
+    tags = ["block-network"],
+)
