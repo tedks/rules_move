@@ -15,8 +15,12 @@
 #   - a target whose srcs come from another repository is refused, in both
 #     directions, and a package path that leaves the repository is refused.
 #
+# A third repository, @fixture_root, holds a Move package at its root.
+#
 # usage: e2e/run.sh   (from the repository root, inside `nix develop`)
-# Needs network for the first fetch of the Sui release and the Move stdlib.
+# E2E_BAZEL selects the Bazel binary (default: bazel on PATH), e.g. a Bazel
+# 7.6 build; see the README. Needs network for the first fetch of the Sui
+# release and the Move stdlib.
 set -euo pipefail
 
 root=$(git rev-parse --show-toplevel)
@@ -26,8 +30,11 @@ head=$(git -C "$root" rev-parse HEAD)
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/rules_move_e2e.XXXXXX")
 ws=$scratch/consumer
 child=$scratch/child
+child_root=$scratch/child_root
+src=$scratch/src
 output_base=$scratch/output_base
-bazel_cmd() { (cd "$ws" && bazel --output_base="$output_base" "$@" </dev/null); }
+bazel_bin=${E2E_BAZEL:-bazel}
+bazel_cmd() { (cd "$ws" && "$bazel_bin" --output_base="$output_base" "$@" </dev/null); }
 cleanup() {
   bazel_cmd shutdown >/dev/null 2>&1 || true
   chmod -R u+w "$scratch" 2>/dev/null || true
@@ -46,14 +53,18 @@ git -C "$root" archive --format=tar.gz --prefix=rules_move/ -o "$archive" "$head
 hex=$(sha256sum "$archive" | cut -d' ' -f1)
 # shellcheck disable=SC2059 # the format is the digest as \x escapes
 integrity="sha256-$(printf "$(sed 's/../\\x&/g' <<<"$hex")" | base64 -w0)"
+# The fixture comes from the same archive, never from the working tree.
+mkdir -p "$src"
+tar -xzf "$archive" -C "$src"
+fixture=$src/rules_move/tests/move_fixture
 
 # One Move package, laid out under DIR (a package directory).
 write_package() {
   local dir=$1
   mkdir -p "$dir/sources" "$dir/tests"
-  cp "$root/tests/move_fixture/Move.toml" "$root/tests/move_fixture/Move.lock" "$dir/"
-  cp "$root/tests/move_fixture/sources/counter.move" "$dir/sources/"
-  cp "$root/tests/move_fixture/tests/counter_tests.move" "$dir/tests/"
+  cp "$fixture/Move.toml" "$fixture/Move.lock" "$dir/"
+  cp "$fixture/sources/counter.move" "$dir/sources/"
+  cp "$fixture/tests/counter_tests.move" "$dir/tests/"
   cat >"$dir/BUILD.bazel" <<'EOF'
 load("@rules_move//sui_move:defs.bzl", "move_package", "move_test")
 
@@ -82,10 +93,12 @@ move_test(
 EOF
 }
 
-mkdir -p "$ws" "$child"
+mkdir -p "$ws" "$child" "$child_root"
 write_package "$ws/app"
 write_package "$child/pkg"
+write_package "$child_root"
 : >"$child/REPO.bazel"
+: >"$child_root/REPO.bazel"
 cp "$root/.bazelversion" "$ws/"
 printf 'build --incompatible_strict_action_env\ntest --test_output=errors\n' >"$ws/.bazelrc"
 cat >"$ws/MODULE.bazel" <<EOF
@@ -125,37 +138,49 @@ move_git_dependency(
 )
 
 local_repository(name = "fixture_child", path = "$child")
+local_repository(name = "fixture_root", path = "$child_root")
 EOF
 
-echo "rules_move e2e: HEAD $head, archive $integrity"
+echo "rules_move e2e: HEAD $head, archive $integrity, $("$bazel_bin" --version </dev/null 2>/dev/null)"
 
 # 1. Both packages build and test, from the main and the external repository.
-if bazel_cmd test //... @fixture_child//... >"$scratch/test.log" 2>&1; then
-  ok "test //... @fixture_child//..."
+if bazel_cmd test //... @fixture_child//... @fixture_root//... >"$scratch/test.log" 2>&1; then
+  ok "test //... @fixture_child//... @fixture_root//..."
 else
-  bad "test //... @fixture_child//..."
+  bad "test //... @fixture_child//... @fixture_root//..."
   tail -40 "$scratch/test.log" >&2
 fi
 testlogs=$(bazel_cmd info bazel-testlogs 2>/dev/null)
-for log in "$testlogs/app/move_test/test.log" "$testlogs"/external/*fixture_child*/pkg/move_test/test.log; do
+for log in "$testlogs/app/move_test/test.log" "$testlogs"/external/*fixture_child*/pkg/move_test/test.log \
+  "$testlogs"/external/*fixture_root*/move_test/test.log; do
   if grep -q "^Test result: OK. Total tests: 2; passed: 2; failed: 0$" "$log" 2>/dev/null; then
     ok "2/2 Move tests in ${log#"$testlogs"/}"
   else
     bad "no 2/2 test summary in ${log#"$testlogs"/}"
   fi
 done
-if bazel_cmd build //app:pkg @fixture_child//pkg:pkg >"$scratch/build.log" 2>&1; then
+# The same sources must give the same bytecode in every repository.
+targets=(//app:pkg @fixture_child//pkg:pkg @fixture_root//:pkg)
+if bazel_cmd build "${targets[@]}" >"$scratch/build.log" 2>&1; then
   execroot=$(bazel_cmd info execution_root 2>/dev/null)
-  for target in //app:pkg @fixture_child//pkg:pkg; do
+  digests=()
+  for target in "${targets[@]}"; do
     out=$(bazel_cmd cquery --output=files "$target" 2>/dev/null)
-    if [[ -f "$execroot/$out/move_fixture/bytecode_modules/counter.mv" ]]; then
-      ok "bytecode for $target ($(sha256sum <"$execroot/$out/move_fixture/bytecode_modules/counter.mv" | cut -c1-16))"
+    module=$execroot/$out/move_fixture/bytecode_modules/counter.mv
+    if [[ -f "$module" ]]; then
+      digests+=("$(sha256sum <"$module" | cut -d' ' -f1)")
     else
       bad "no bytecode for $target"
     fi
   done
+  if [[ ${#digests[@]} -eq 3 && "${digests[0]}" == "${digests[1]}" && "${digests[0]}" == "${digests[2]}" ]]; then
+    ok "identical bytecode for ${targets[*]} (${digests[0]:0:16})"
+  else
+    bad "bytecode differs between repositories: ${digests[*]}"
+  fi
 else
-  bad "build //app:pkg @fixture_child//pkg:pkg"
+  bad "build ${targets[*]}"
+  tail -20 "$scratch/build.log" >&2
 fi
 
 # 2. Exactly one rules_move on the module graph.
@@ -166,9 +191,11 @@ if [[ "$count" -eq 1 ]]; then ok "one rules_move on the module graph"; else bad 
 expect_fail() { # NAME NEEDLE -- bazel args...
   local name=$1 needle=$2
   shift 3
+  # Only this command's output counts (--test_output=errors prints the
+  # failing test's log), so an earlier failure cannot satisfy the check.
   if bazel_cmd "$@" >"$scratch/fail.log" 2>&1; then
     bad "$name: succeeded"
-  elif grep -qF -- "$needle" "$scratch/fail.log" || grep -rqF -- "$needle" "$testlogs" 2>/dev/null; then
+  elif grep -qF -- "$needle" "$scratch/fail.log"; then
     ok "$name"
   else
     bad "$name: no '$needle'"
@@ -205,7 +232,7 @@ move_test(
     deps = ["@move_std//:cache.tar"],
 )
 EOF
-expect_fail "main-repo target with external srcs is refused" "must come from its own repository" -- build //cross:from_child
+expect_fail "main-repo target with external srcs is refused" "cross:from_child must come from its own repository" -- build //cross:from_child
 rm -r "$ws/cross"
 
 mkdir -p "$child/cross"
@@ -230,12 +257,12 @@ move_package(
     deps = ["@move_std//:cache.tar"],
 )
 EOF
-expect_fail "external target with main-repo srcs is refused" "must come from its own repository" -- build @fixture_child//cross:from_main
+expect_fail "external target with main-repo srcs is refused" "cross:from_main must come from its own repository" -- build @fixture_child//cross:from_main
 expect_fail "package path leaving the repository is refused" "package must be a workspace-relative directory" -- build @fixture_child//cross:escape
 rm -r "$child/cross"
 
 # 5. Restored tree passes again.
-if bazel_cmd test //... @fixture_child//... >"$scratch/test2.log" 2>&1; then ok "restored tree passes"; else bad "restored tree fails"; fi
+if bazel_cmd test //... @fixture_child//... @fixture_root//... >"$scratch/test2.log" 2>&1; then ok "restored tree passes"; else bad "restored tree fails"; fi
 
 if [[ $failures -ne 0 ]]; then
   echo "e2e: $failures check(s) failed" >&2
