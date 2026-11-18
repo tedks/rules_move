@@ -55,7 +55,7 @@ _COMMON_ATTRS = {
         doc = "move_git_dependency archives (`@repo//:cache.tar`) for every git dependency in Move.lock.",
     ),
     "package": attr.string(
-        doc = "Directory holding Move.toml, relative to the target's repository root. Defaults to this BUILD file's package.",
+        doc = "Directory holding Move.toml, relative to the target's repository root (\".\" for the root). Defaults to this BUILD file's package.",
     ),
     "srcs": attr.label_list(
         allow_files = True,
@@ -65,8 +65,9 @@ _COMMON_ATTRS = {
 }
 
 def _package_dir(ctx):
-    package = ctx.attr.package or ctx.label.package
-    if not package or package.startswith("/") or ".." in package.split("/"):
+    # "." is the repository root: a BUILD file there, or package = ".".
+    package = ctx.attr.package or ctx.label.package or "."
+    if package.startswith("/") or ".." in package.split("/") or "" in package.split("/"):
         fail("package must be a workspace-relative directory, got '%s'" % package)
     return package
 
@@ -77,7 +78,8 @@ def _staging_lines(ctx, package, runfiles_relative):
     # repository short_path is "../<repo>/<path>"; that prefix is removed.
     repo = ctx.label.workspace_name
     prefix = "../" + repo + "/" if repo else ""
-    required = {package + "/Move.lock": False, package + "/Move.toml": False}
+    package_prefix = "" if package == "." else package + "/"
+    required = {package_prefix + "Move.lock": False, package_prefix + "Move.toml": False}
     lines = []
     for f in ctx.files.srcs:
         if f.owner.workspace_name != repo or not f.short_path.startswith(prefix):

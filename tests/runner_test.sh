@@ -146,6 +146,19 @@ setup
 run_runner test - "$PACKAGE/Move.toml"$'\t'"../escape" -- "$STD_TAR"
 expect_failure refuses_staging_outside_root $? "refusing to stage"
 
+# A package at the staging root, as for a Move package at a repository root:
+# the files are staged without a directory and the package path is ".".
+setup
+manifest=$case_root/stage.manifest
+(cd "$case_root" && find "$PACKAGE" -type f -printf '%p\t%P\n') >"$manifest"
+(cd "$case_root" && timeout 120 "$RUNNER" test "$SUI" "$GIT" . mainnet "$manifest" - "$STD_TAR") </dev/null >"$log" 2>&1
+rc=$?
+if [[ $rc -eq 0 ]] && grep -qF "passed 2 Move unit tests" "$log"; then
+  pass package_at_root
+else
+  fail package_at_root "runner failed ($rc) or did not pass 2 tests"
+fi
+
 if [[ $failures -ne 0 ]]; then
   echo "$failures runner case(s) failed" >&2
   exit 1
