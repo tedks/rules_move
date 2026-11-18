@@ -55,7 +55,7 @@ _COMMON_ATTRS = {
         doc = "move_git_dependency archives (`@repo//:cache.tar`) for every git dependency in Move.lock.",
     ),
     "package": attr.string(
-        doc = "Workspace-relative directory holding Move.toml. Defaults to this BUILD file's package.",
+        doc = "Directory holding Move.toml, relative to the target's repository root. Defaults to this BUILD file's package.",
     ),
     "srcs": attr.label_list(
         allow_files = True,
@@ -71,17 +71,24 @@ def _package_dir(ctx):
     return package
 
 def _staging_lines(ctx, package, runfiles_relative):
+    # Every source must belong to the target's own repository (the main one or
+    # an external one). It is staged at its path relative to that repository's
+    # root, so `local` dependencies keep their layout. In an external
+    # repository short_path is "../<repo>/<path>"; that prefix is removed.
+    repo = ctx.label.workspace_name
+    prefix = "../" + repo + "/" if repo else ""
     required = {package + "/Move.lock": False, package + "/Move.toml": False}
     lines = []
     for f in ctx.files.srcs:
-        if f.owner.workspace_name:
-            fail("srcs must come from this repository, got %s" % f.owner)
+        if f.owner.workspace_name != repo or not f.short_path.startswith(prefix):
+            fail("srcs of %s must come from its own repository (@%s), got %s" % (ctx.label, repo, f.owner))
+        staged = f.short_path[len(prefix):]
         if "\t" in f.short_path or "\n" in f.short_path:
             fail("unsupported character in path %s" % f.short_path)
-        if f.short_path in required:
-            required[f.short_path] = True
+        if staged in required:
+            required[staged] = True
         source = f.short_path if runfiles_relative else f.path
-        lines.append(source + "\t" + f.short_path)
+        lines.append(source + "\t" + staged)
     for path, present in required.items():
         if not present:
             fail("srcs must include %s: the committed lock is the dependency pin" % path)
