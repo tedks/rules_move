@@ -1,0 +1,7 @@
+[package]
+name = "move_fixture"
+edition = "2024"
+implicit-dependencies = false
+
+[dependencies]
+std = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/move-stdlib", rev = "782577ca40c9ef0b3f400ade8bc2cc2dcd0e2b23" }
