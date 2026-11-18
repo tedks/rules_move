@@ -20,7 +20,7 @@
 # re-resolution, fails instead of fetching. The staged copy keeps the Sui CLI
 # from ever writing into the source tree.
 #
-# Part of rules_sui_move; see the README at the repository root.
+# Part of rules_move; see the README at the repository root.
 set -euo pipefail
 
 die() {

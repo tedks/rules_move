@@ -1,6 +1,6 @@
 """Repository rules for offline Sui Move builds.
 
-Part of rules_sui_move; see the README at the repository root.
+Part of rules_move; see the README at the repository root.
 
 `sui_release` fetches one official Sui CLI release archive by integrity and
 keeps only the `sui` executable. `move_git_dependency` fetches one pinned

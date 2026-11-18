@@ -1,7 +1,7 @@
-"""rules_sui_move: Bazel rules that build and test Sui Move packages offline."""
+"""rules_move: Bazel rules that build and test Sui Move packages offline."""
 
 module(
-    name = "rules_sui_move",
+    name = "rules_move",
     version = "0.1.0",
 )
 

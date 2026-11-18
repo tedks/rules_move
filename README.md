@@ -1,4 +1,4 @@
-# rules_sui_move
+# rules_move
 
 Bazel rules that compile a [Sui](https://github.com/MystenLabs/sui) Move
 package and run its Move unit tests without network access, using the Sui
@@ -25,10 +25,10 @@ The module is not in the Bazel Central Registry. Declare it and point it at
 a fixed revision, for example a git submodule:
 
 ```starlark
-bazel_dep(name = "rules_sui_move", version = "0.1.0")
+bazel_dep(name = "rules_move", version = "0.1.0")
 local_path_override(
-    module_name = "rules_sui_move",
-    path = "third_party/rules_sui_move",  # a submodule pinned to a commit
+    module_name = "rules_move",
+    path = "third_party/rules_move",  # a submodule pinned to a commit
 )
 ```
 
@@ -36,9 +36,9 @@ or a fetched commit:
 
 ```starlark
 git_override(
-    module_name = "rules_sui_move",
+    module_name = "rules_move",
     commit = "<full commit>",
-    remote = "https://github.com/tedks/rules_sui_move.git",
+    remote = "https://github.com/tedks/rules_move.git",
 )
 ```
 
@@ -51,9 +51,9 @@ packages: list it in `.bazelignore` (or `ignore_directories` in
 In `MODULE.bazel`:
 
 ```starlark
-sui_release = use_repo_rule("@rules_sui_move//sui_move:repositories.bzl", "sui_release")
-move_git_dependency = use_repo_rule("@rules_sui_move//sui_move:repositories.bzl", "move_git_dependency")
-move_host_git = use_repo_rule("@rules_sui_move//sui_move:repositories.bzl", "move_host_git")
+sui_release = use_repo_rule("@rules_move//sui_move:repositories.bzl", "sui_release")
+move_git_dependency = use_repo_rule("@rules_move//sui_move:repositories.bzl", "move_git_dependency")
+move_host_git = use_repo_rule("@rules_move//sui_move:repositories.bzl", "move_host_git")
 
 move_host_git(name = "move_host_git")
 
@@ -75,7 +75,7 @@ move_git_dependency(
 In the package's `BUILD.bazel`:
 
 ```starlark
-load("@rules_sui_move//sui_move:defs.bzl", "move_package", "move_test", "sui_pin_test")
+load("@rules_move//sui_move:defs.bzl", "move_package", "move_test", "sui_pin_test")
 
 move_package(  # outputs <name>/bytecode_modules/*.mv (+ dependencies/)
     name = "pkg",

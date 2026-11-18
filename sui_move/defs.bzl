@@ -1,6 +1,6 @@
 """Bazel rules that build and test one Sui Move package offline.
 
-Part of rules_sui_move; see the README at the repository root.
+Part of rules_move; see the README at the repository root.
 
 `move_package` compiles the package with `sui move build` and outputs a tree
 of bytecode: `<package name>/bytecode_modules/*.mv`, plus the compiled

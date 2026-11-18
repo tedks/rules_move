@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# End-to-end check: consume rules_sui_move from an archive of the committed
+# End-to-end check: consume rules_move from an archive of the committed
 # tree in a separate Bazel workspace.
 #
-# The consumer root depends on rules_sui_move only through archive_override
+# The consumer root depends on rules_move only through archive_override
 # (a file:// URL and its integrity), exactly as it would on a release
 # archive. It declares its own Sui release and dependency repositories, has
 # a Move package in its main repository and another in an external
 # repository (@fixture_child, a local_repository), and checks that:
 #
 #   - both packages build bytecode and pass their tests (2 Move tests each);
-#   - rules_sui_move appears exactly once on the module graph;
+#   - rules_move appears exactly once on the module graph;
 #   - a broken assertion fails each package's move_test, and a compile error
 #     fails the external package's build;
 #   - a target whose srcs come from another repository is refused, in both
@@ -23,7 +23,7 @@ root=$(git rev-parse --show-toplevel)
 head=$(git -C "$root" rev-parse HEAD)
 [[ -z "$(git -C "$root" status --porcelain)" ]] || echo "note: uncommitted changes are NOT tested; testing HEAD $head" >&2
 
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/rules_sui_move_e2e.XXXXXX")
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/rules_move_e2e.XXXXXX")
 ws=$scratch/consumer
 child=$scratch/child
 output_base=$scratch/output_base
@@ -41,8 +41,8 @@ ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1" >&2; failures=$((failures + 1)); }
 
 # The archive Bazel consumes: the committed tree, as a release would be.
-archive=$scratch/rules_sui_move.tar.gz
-git -C "$root" archive --format=tar.gz --prefix=rules_sui_move/ -o "$archive" "$head"
+archive=$scratch/rules_move.tar.gz
+git -C "$root" archive --format=tar.gz --prefix=rules_move/ -o "$archive" "$head"
 hex=$(sha256sum "$archive" | cut -d' ' -f1)
 # shellcheck disable=SC2059 # the format is the digest as \x escapes
 integrity="sha256-$(printf "$(sed 's/../\\x&/g' <<<"$hex")" | base64 -w0)"
@@ -55,7 +55,7 @@ write_package() {
   cp "$root/tests/move_fixture/sources/counter.move" "$dir/sources/"
   cp "$root/tests/move_fixture/tests/counter_tests.move" "$dir/tests/"
   cat >"$dir/BUILD.bazel" <<'EOF'
-load("@rules_sui_move//sui_move:defs.bzl", "move_package", "move_test")
+load("@rules_move//sui_move:defs.bzl", "move_package", "move_test")
 
 filegroup(
     name = "srcs",
@@ -91,17 +91,17 @@ printf 'build --incompatible_strict_action_env\ntest --test_output=errors\n' >"$
 cat >"$ws/MODULE.bazel" <<EOF
 module(name = "e2e_consumer")
 
-bazel_dep(name = "rules_sui_move", version = "0.1.0")
+bazel_dep(name = "rules_move", version = "0.1.0")
 archive_override(
-    module_name = "rules_sui_move",
+    module_name = "rules_move",
     integrity = "$integrity",
-    strip_prefix = "rules_sui_move",
+    strip_prefix = "rules_move",
     urls = ["file://$archive"],
 )
 
-sui_release = use_repo_rule("@rules_sui_move//sui_move:repositories.bzl", "sui_release")
-move_git_dependency = use_repo_rule("@rules_sui_move//sui_move:repositories.bzl", "move_git_dependency")
-move_host_git = use_repo_rule("@rules_sui_move//sui_move:repositories.bzl", "move_host_git")
+sui_release = use_repo_rule("@rules_move//sui_move:repositories.bzl", "sui_release")
+move_git_dependency = use_repo_rule("@rules_move//sui_move:repositories.bzl", "move_git_dependency")
+move_host_git = use_repo_rule("@rules_move//sui_move:repositories.bzl", "move_host_git")
 local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
 
 move_host_git(name = "move_host_git")
@@ -127,7 +127,7 @@ move_git_dependency(
 local_repository(name = "fixture_child", path = "$child")
 EOF
 
-echo "rules_sui_move e2e: HEAD $head, archive $integrity"
+echo "rules_move e2e: HEAD $head, archive $integrity"
 
 # 1. Both packages build and test, from the main and the external repository.
 if bazel_cmd test //... @fixture_child//... >"$scratch/test.log" 2>&1; then
@@ -158,9 +158,9 @@ else
   bad "build //app:pkg @fixture_child//pkg:pkg"
 fi
 
-# 2. Exactly one rules_sui_move on the module graph.
-count=$(bazel_cmd mod graph 2>/dev/null | grep -c 'rules_sui_move@' || true)
-if [[ "$count" -eq 1 ]]; then ok "one rules_sui_move on the module graph"; else bad "rules_sui_move appears $count times on the module graph"; fi
+# 2. Exactly one rules_move on the module graph.
+count=$(bazel_cmd mod graph 2>/dev/null | grep -c 'rules_move@' || true)
+if [[ "$count" -eq 1 ]]; then ok "one rules_move on the module graph"; else bad "rules_move appears $count times on the module graph"; fi
 
 # 3. Failure propagation in both repositories.
 expect_fail() { # NAME NEEDLE -- bazel args...
@@ -194,7 +194,7 @@ restore_file "$child/pkg/sources/counter.move"
 #    repository, are refused at analysis.
 mkdir -p "$ws/cross"
 cat >"$ws/cross/BUILD.bazel" <<'EOF'
-load("@rules_sui_move//sui_move:defs.bzl", "move_test")
+load("@rules_move//sui_move:defs.bzl", "move_test")
 
 move_test(
     name = "from_child",
@@ -210,7 +210,7 @@ rm -r "$ws/cross"
 
 mkdir -p "$child/cross"
 cat >"$child/cross/BUILD.bazel" <<'EOF'
-load("@rules_sui_move//sui_move:defs.bzl", "move_package")
+load("@rules_move//sui_move:defs.bzl", "move_package")
 
 move_package(
     name = "from_main",

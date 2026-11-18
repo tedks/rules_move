@@ -1,4 +1,4 @@
-# Agent instructions: rules_sui_move
+# Agent instructions: rules_move
 
 Bazel rules for building and testing Sui Move packages offline. The rules
 live in `sui_move/`; `tests/` holds a neutral fixture and the runner's

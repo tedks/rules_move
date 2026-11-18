@@ -1,5 +1,5 @@
 {
-  description = "Development shell for rules_sui_move";
+  description = "Development shell for rules_move";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/56c02bc00adcf003215cc4bd996d6efaf4cff188";
 
